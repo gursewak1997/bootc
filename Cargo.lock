@@ -194,9 +194,11 @@ dependencies = [
  "camino",
  "fn-error-context",
  "indoc",
+ "libc",
  "regex",
  "serde",
  "serde_json",
+ "tempfile",
  "tracing",
 ]
 
