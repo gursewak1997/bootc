@@ -58,7 +58,7 @@ def extract_reviewers_from_maintainers() -> List[str]:
         for line in lines:
             line = line.strip()
             
-            # Skip empty lines
+            # Skip empty lines - test
             if not line:
                 continue
             
@@ -245,13 +245,9 @@ def main():
     sprint_info = get_current_sprint_info(rotation_info)
     print(f"Current sprint: {sprint_info['sprint_number']}, week: {sprint_info['week_in_sprint']}")
     
-    # Calculate current reviewer
-    current_reviewer = calculate_current_reviewer(reviewers, rotation_info)
-    if not current_reviewer:
-        print("Error: Could not calculate current reviewer")
-        sys.exit(1)
-    
-    print(f"Assigned reviewer for this week: {current_reviewer}")
+    # For testing in fork, always assign gursewak1997
+    current_reviewer = "gursewak1997"
+    print(f"Testing mode: assigned reviewer {current_reviewer}")
     
     # Get existing reviewers
     existing_reviewers = get_existing_reviewers(pr_number)
