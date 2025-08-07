@@ -82,7 +82,7 @@ def extract_reviewers_from_maintainers() -> List[str]:
                 columns = [col.strip() for col in line.split('|')[1:-1]]
                 if len(columns) > github_id_column_index:
                     github_id_cell = columns[github_id_column_index]
-                    match = re.search(r'\[([a-zA-Z0-9-]+)\]\(https://github\.com/[^)]+\)', github_id_cell)
+                    match = re.search(r'\[([a-zA-Z0-9-]+)\]\(https://github\.com/.*\)', github_id_cell)
                     if match:
                         username = match.group(1)
                         if username and username not in reviewers:
@@ -144,7 +144,6 @@ def calculate_rotation_info(config: dict) -> RotationInfo:
 
 def get_current_sprint_info(rotation_info: RotationInfo) -> SprintInfo:
     """Calculate current sprint information."""
-    
     if rotation_info["before_start"]:
         return {
             "sprint_number": 1,
@@ -182,6 +181,15 @@ def calculate_current_reviewer(reviewers: List[str], rotation_info: RotationInfo
     reviewer_index = (total_weeks // rotation_cycle_weeks) % len(reviewers)
     
     return reviewers[reviewer_index]
+
+
+def get_pr_author(pr_number: str) -> str:
+    """Get the author of the PR."""
+    result = run_gh_command(
+        ['pr', 'view', pr_number, '--json', 'author', '--jq', '.author.login'],
+        f"Could not fetch PR author for PR {pr_number}"
+    )
+    return result.stdout.strip()
 
 
 def run_gh_command(args: List[str], error_message: str) -> subprocess.CompletedProcess:
@@ -253,6 +261,10 @@ def main():
     
     print(f"Assigned reviewer for this week: {current_reviewer}")
     
+    # Get PR author to exclude them from being assigned
+    pr_author = get_pr_author(pr_number)
+    print(f"PR author: {pr_author}")
+    
     # Get existing reviewers
     existing_reviewers = get_existing_reviewers(pr_number)
     
@@ -260,6 +272,30 @@ def main():
     if current_reviewer in existing_reviewers:
         print(f"Reviewer {current_reviewer} is already assigned to PR {pr_number}")
         return
+    
+    # Check if current reviewer is the PR author
+    if current_reviewer == pr_author:
+        print(f"Current reviewer {current_reviewer} is the PR author, finding next reviewer")
+        # Find next reviewer in rotation
+        total_weeks = int(rotation_info["weeks_since_start"])
+        rotation_cycle_weeks = rotation_info["rotation_cycle_weeks"]
+        reviewer_index = (total_weeks // rotation_cycle_weeks) % len(reviewers)
+        
+        # Try next reviewer in the list
+        next_reviewer_index = (reviewer_index + 1) % len(reviewers)
+        current_reviewer = reviewers[next_reviewer_index]
+        print(f"Using next reviewer: {current_reviewer}")
+        
+        # If next reviewer is also the author, keep going until we find one that isn't
+        attempts = 0
+        while current_reviewer == pr_author and attempts < len(reviewers):
+            next_reviewer_index = (next_reviewer_index + 1) % len(reviewers)
+            current_reviewer = reviewers[next_reviewer_index]
+            attempts += 1
+        
+        if current_reviewer == pr_author:
+            print("Warning: All reviewers are the PR author, skipping assignment")
+            return
     
     # Assign the current reviewer
     assign_reviewer(pr_number, current_reviewer)
